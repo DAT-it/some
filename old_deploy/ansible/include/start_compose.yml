@@ -1,0 +1,9 @@
+---
+- template: src=env.j2 dest="{{project_path}}/.env"
+  when: project[project_name].compose is defined
+
+- name: start compose
+  shell: /usr/local/bin/docker-compose up -d
+  args:
+    chdir: "{{project_path}}"
+  when: project[project_name].compose is defined

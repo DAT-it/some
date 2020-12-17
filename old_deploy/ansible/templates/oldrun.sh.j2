@@ -1,0 +1,7 @@
+docker run \
+ --name "{{old_name}}" \
+ -d --restart always \
+ -p {{ old_ports }}:{{ internalport }} \
+ -e STAGE={{envv}} \
+ {{ runvolum }} \
+ {{ project[project_name].imgname }}

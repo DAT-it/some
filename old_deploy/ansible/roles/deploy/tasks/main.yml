@@ -1,0 +1,28 @@
+---
+- local_action: stat path="{{ base_path }}/docker-compose.yml"
+  register: source_docker_compose
+  become: no
+
+- name: Deploy docker-compose
+  #  include: compose.yml
+  include_tasks: compose.yml
+  static: no
+  when: project[project_name].compose is defined
+
+- name: Deploy project content
+  synchronize:
+    src: "{{ base_path }}/trunk"
+    dest: "{{ project_path }}/"
+    perms: yes
+    recursive: yes
+    delete: yes
+    rsync_opts: "--exclude=*@*"
+  when: project[project_name].compose is not defined
+
+- name: Change permissions project folder
+  file:
+    dest: "{{ project_path }}"
+    owner: www-data
+    group: www-data
+    state: directory
+    recurse: yes

@@ -1,0 +1,51 @@
+---
+- hosts: "{{hosts|default('sandbox')}}"
+  become: yes
+  vars:
+    project_name: default
+    envv: development
+    imgname: "web100webpr/webpr:apache2_php5"
+    ngimgname: "web100webpr/webpr:nginx"
+  tasks:
+
+  - file:
+      dest: /var/www/{{project_name}}/trunk/html/
+      owner: www-data
+      group: www-data
+      state: directory
+      recurse: yes
+    tags: [ 'project' ]
+
+  - template: src=nginx.conf.j2 dest=/var/www/_global_cfg/nginx/cfg/{{project_name}}.conf
+    tags: [ 'project' ]
+  - template: src=run.sh.j2 dest=/var/www/{{project_name}}/{{project_name}}.sh mode=0755
+    tags: [ 'project' ]
+
+  - name: Restart nginx container
+    command: docker restart "nginx-proxy"
+    tags: [ 'project' ]
+
+  - name: Create a new database {{project_name}}
+    mysql_db:
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - "{{ project[project_name].dbname }}"
+    when: (project[project_name].dbname is defined)
+    tags: [ 'mysql' ]
+
+  - mysql_user:
+      name: "{{ project[project_name].dbuser }}"
+      password: "{{ project[project_name].dbpass }}"
+      priv: '{{ project[project_name].dbname }}.*:ALL'
+      append_privs: yes
+      login_user: root
+      login_password: "{{ mysql_root_pass }}"
+      host: "{{ item }}"
+      state: present
+    with_items:
+     - "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+     - '172.17.0.%'
+    when: (project[project_name].dbuser is defined)
+    tags: [ 'mysql' ]
+

@@ -1,0 +1,34 @@
+---
+- file:
+    path: "{{ project_path }}"
+    state: directory
+
+- name: Check Dockerfile
+  local_action: stat path="{{ base_path }}/{{ DFname }}"
+  register: docker_file
+  become: no
+
+- local_action: stat path="{{ base_path }}/docker-compose.yml"
+  register: source_docker_compose
+  become: no
+
+- action: stat path="{{ project_path }}/docker-compose.yml"
+  register: target_docker_compose
+
+- name: Cleanup trunk folder
+  file:
+    dest: "{{ project_path }}/trunk"
+    state: absent
+  when: project[project_name].compose is not defined
+
+- name: Cleanup project folder
+  #  include: compose.yml
+  include_tasks: compose.yml
+  static: no
+  when: project[project_name].compose is defined
+
+- name: Remove image
+  #  include: build.yml
+  include_tasks: build.yml
+  static: no
+  when: project[project_name].buildck is defined

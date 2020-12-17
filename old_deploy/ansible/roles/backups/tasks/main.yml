@@ -1,0 +1,18 @@
+---
+- name: backup trunk
+  synchronize:
+    src: "{{ project_path }}/trunk/"
+    dest: "{{ project_path }}/backup/"
+    perms: yes
+    recursive: yes
+  delegate_to: "{{ inventory_hostname }}"
+  when: (project[project_name].compose is not defined)
+
+- name: Dump databases
+  mysql_db:
+    state: dump
+    name: "{{ item }}"
+    target: "{{ project_path }}/backup/backup_{{ item }}.sql"
+  with_items:
+  - "{{ project[project_name].dbname }}"
+  when: (project[project_name].dbname is defined and project[project_name].compose is not defined)

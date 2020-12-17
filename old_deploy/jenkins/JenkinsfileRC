@@ -1,0 +1,117 @@
+final BUILD_INFO_FILE_NAME = 'build.txt'
+node('corp') {
+  try {
+    step([$class: 'WsCleanup'])
+
+    currentBuild.displayName = "Build id: ${BUILD_NUMBER}-${ENVV}"
+    currentBuild.description = "Project: ${PROJECT}, Source: ${TAG} \n Target host: ${HOST}"
+
+    checkout scm
+
+    stage('Checkout') {
+        checkout([$class: 'GitSCM',
+                  //branches: [[name: '*/master']],
+                  branches: [[name: "${TAG}"]],
+                  doGenerateSubmoduleConfigurations: false,
+                  extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'project'],
+                               [$class: 'CloneOption', noTags: false, shallow: true]],
+                  submoduleCfg: [],
+                  submoduleCfg: [],
+                  userRemoteConfigs: [[url: "https://***********@bitbucket.org/*******/${PROJECT_SOURCE}.git", credentialsId: '*************']]
+        ]);
+    }
+
+    stage('Build') {
+        wrap([$class: 'BuildUser']) {
+            dir("${BUILD_INFO_FILE_PATH}") {
+                def user = env.BUILD_USER? env.BUILD_USER : "Jenkins";
+                def email = env.BUILD_USER_EMAIL? env.BUILD_USER_EMAIL : "Started by timer.";
+
+                revision = sh(returnStdout: true, script: "git rev-parse --verify HEAD").trim()
+                sh "echo Build URL: ${BUILD_URL} > ${BUILD_INFO_FILE_NAME}"
+                sh "echo Build id: ${BUILD_ID} >> ${BUILD_INFO_FILE_NAME}"
+                sh "echo Build user: ${user} [${email}] >> ${BUILD_INFO_FILE_NAME}"
+                sh "echo Build time: ${BUILD_TIMESTAMP} >> ${BUILD_INFO_FILE_NAME}"
+                sh "echo Project: ${PROJECT} >> ${BUILD_INFO_FILE_NAME}"
+                sh "echo Target Host: ${HOST} >> ${BUILD_INFO_FILE_NAME}"
+                sh "echo Git branch: ${TAG} >> ${BUILD_INFO_FILE_NAME}"
+                sh "echo Git revision: ${revision} >> ${BUILD_INFO_FILE_NAME}"
+            }
+        }
+    }
+
+    stage('Shutdown') {
+        sh "ansible-playbook ansible/deploy.yml " +
+                "--tags \"shutdown\" " +
+                "--extra-vars \"" +
+                "hosts=${HOST} " +
+                "envv=${ENVV} " +
+                "dockerfilename=${DFNAME} " +
+                "project_name=${PROJECT}\""
+    }
+
+    stage('Cleanup') {
+        sh "ansible-playbook ansible/deploy.yml " +
+                "--tags \"cleanup\" " +
+                "--extra-vars \"" +
+                "hosts=${HOST} " +
+                "envv=${ENVV} " +
+                "dockerfilename=${DFNAME} " +
+                "project_name=${PROJECT}\""
+    }
+
+    stage('Deploy') {
+        sh "ansible-playbook ansible/deploy.yml " +
+                "--tags \"deploy\" " +
+                "--extra-vars \"" +
+                "hosts=${HOST} " +
+                "envv=${ENVV} " +
+                "dockerfilename=${DFNAME} " +
+                "project_name=${PROJECT}\""
+    }
+
+    stage('Migrate') {
+        sh "ansible-playbook ansible/deploy.yml " +
+                "--tags \"migrate\" " +
+                "--extra-vars \"" +
+                "hosts=${HOST} " +
+                "envv=${ENVV} " +
+                "dockerfilename=${DFNAME} " +
+                "project_name=${PROJECT}\""
+    }
+
+    stage('Run') {
+        sh "ansible-playbook ansible/deploy.yml " +
+                "--tags \"run\" " +
+                "--extra-vars \"" +
+                "hosts=${HOST} " +
+                "envv=${ENVV} " +
+                "dockerfilename=${DFNAME} " +
+                "project_name=${PROJECT}\""
+    }
+  step([$class: 'WsCleanup'])
+  } catch (e) {
+    currentBuild.result = "FAILED"
+    notifyFailed()
+    throw e
+  }
+}
+
+def notifyFailed() {
+  emailext (
+      to: "${mailRecipients}",
+      subject: "FAILED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+      body: """
+      FAILED: Job '${PROJECT} ${env.JOB_NAME}':
+      Check console output at "${env.JOB_NAME} [${env.BUILD_NUMBER}]"
+      Build URL: '${BUILD_URL}'
+      Build id: '${BUILD_ID}'
+      Build user: '${user}' ['${email}']
+      Build time: '${BUILD_TIMESTAMP}'
+      Project: '${PROJECT}'
+      Target Host: '${HOST}'
+      Git branch: '${TAG}'
+      Git revision: '${revision}'
+      """
+   )
+}

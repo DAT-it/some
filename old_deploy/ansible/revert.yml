@@ -1,0 +1,22 @@
+---
+- hosts: "{{hosts|default('sandbox')}}"
+  become: yes
+  tasks:
+
+  - name: import db
+    mysql_db:
+      name: "{{item}}"
+      state: import
+      target: "/var/www/{{project_name}}/back_trunk/back_{{item}}.sql"
+    with_items:
+      - "{{ project[project_name].dbname }}"
+    tags: ['revert']
+
+  - name: revert trunk
+    synchronize:
+      src: /var/www/{{project_name}}/back_trunk/
+      dest: /var/www/{{project_name}}/trunk/
+      perms: yes
+      recursive: yes
+    delegate_to: "{{ inventory_hostname }}"
+    tags: ['revert']

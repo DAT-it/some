@@ -1,0 +1,4 @@
+---
+#setup_project:
+project:
+  test: { site_name: "default", ports: "8080", envv: "development" , volumes: "-v /var/www/html:/var/www/html" , imgname: "web100webpr/webpr:apache2_php5", intport: "8080" }

@@ -1,0 +1,25 @@
+---
+- local_action: stat path="{{base_path}}/migrations"
+  register: st
+  become: no
+
+- name: Deploy migrations
+  synchronize:
+    src: "{{ base_path }}/migrations"
+    dest: "{{ project_path }}"
+    perms: yes
+    recursive: yes
+    delete: yes
+  when: (st.stat.isdir is defined and st.stat.isdir and project[project_name].compose is not defined)
+
+- name: Change permissions for liquibase script
+  file:
+    dest: "{{ project_path }}/migrations/liquibase"
+    mode: 0770
+  when: (st.stat.isdir is defined and st.stat.isdir and project[project_name].compose is not defined)
+
+- name: Run migrations for {{envv}} environment
+  shell: ./liquibase --defaultsFile=config/{{ envv }}.properties update
+  args:
+    chdir: "{{ project_path }}/migrations"
+  when: (st.stat.isdir is defined and st.stat.isdir and project[project_name].compose is not defined)

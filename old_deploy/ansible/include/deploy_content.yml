@@ -1,0 +1,9 @@
+---
+- name: Deploy docker-compose
+  synchronize:
+    src: "{{base_pas}}"
+    dest: "{{project_path}}"
+    perms: yes
+    recursive: yes
+    delete: yes
+    rsync_opts: "--exclude=*@*"

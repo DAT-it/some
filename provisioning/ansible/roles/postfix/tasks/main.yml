@@ -1,0 +1,18 @@
+---
+- name: Set Postfix option type as internet site
+  debconf:
+    name: postfix
+    question: "postfix/main_mailer_type"
+    value: "'Internet Site'"
+    vtype: "string"
+
+- name: install postfix
+  apt:
+    name: postfix
+    state: present
+
+- name: sending test mail
+  mail:
+    to: admin <admin@itdecision.com.ua>
+    subject: Ansible-report
+    body: System {{ ansible_hostname }} has been successfully provisioned.

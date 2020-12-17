@@ -1,0 +1,9 @@
+---
+ansible_python_interpreter: "/usr/bin/python3"
+thostip: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+mysql_root_password: "{{ mysql_root_pass }}"
+http_host: "test.org"
+http_conf: "test.org.conf"
+http_port: "80"
+redis_pass: "{{ redis_pass_sec }}"
+redis_prefix: "{{ redis_prefix_sec }}"

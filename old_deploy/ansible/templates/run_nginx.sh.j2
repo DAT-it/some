@@ -1,0 +1,9 @@
+docker run -d --restart always \
+ -p 80:80 \
+ -v /var/www/_global_cfg/nginx/cache:/etc/nginx/conf.d \
+ -v /var/www/_global_cfg/nginx/cfg:/etc/nginx/sites-enabled \
+ -v /var/www/_global_cfg/nginx/include:/etc/nginx/include \
+ -v /var/www/_global_cfg/nginx/html:/var/www/html \
+ -v /var/log/nginx:/var/log/nginx \
+ --name nginx-proxy \
+ nginx

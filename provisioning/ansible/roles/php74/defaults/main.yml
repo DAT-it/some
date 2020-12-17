@@ -1,0 +1,39 @@
+---
+php_ppa: "ppa:ondrej/php"
+php_packages:
+  - php7.4-common
+  - php7.4-cli
+  - php7.4-dev
+  - php7.4-intl
+  - php7.4-curl
+  - php7.4-cgi
+  - php7.4-fpm
+  - php7.4-mysql
+  - php7.4-gd
+#  - php7.4-mcrypt
+  - php7.4-mbstring
+  - php7.4-opcache
+  - php7.4-apcu
+  - php7.4-xml
+  - php7.4-json
+  - php
+  - php-cli
+  - php-common
+  - php-mbstring
+  - php-xml
+  - php-json
+php_timezone: Europe/Kiev
+php_upload_max_filesize: "64M"
+php_post_max_size: "64M"
+php_memory_limit: "1024M"
+php_max_execution_time: 60
+
+php_opcache_enable: 1
+php_opcache_revalidate_freq: 2592000
+php_opcache_opcache_validate_timestamps: 1
+php_opcache_max_accelerated_files: 20000
+php_opcache_memory_consumption: 192
+php_opcache_interned_strings_buffer: 16
+php_opcache_fast_shutdown: 1
+
+php_allow_url_fopen: 0

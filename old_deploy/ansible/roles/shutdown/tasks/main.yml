@@ -1,0 +1,8 @@
+---
+- name: Remove Container
+  docker_container:
+    name: "{{ project_name }}"
+    state: absent
+    force_kill: yes
+    timeout: 600
+  when: (project[project_name].compose is not defined)

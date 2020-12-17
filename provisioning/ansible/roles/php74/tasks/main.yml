@@ -1,0 +1,17 @@
+---
+- name: Add repository for Ubuntu
+  apt_repository:
+    repo: "{{ php_ppa }}"
+    state: present
+
+- name: Install PHP Packages
+  apt:
+    name: "{{ item }}"
+    state: latest
+    update_cache: yes
+  with_items: "{{ php_packages }}"
+  when: php_packages is defined
+  notify:
+    - restart php7-fpm
+
+- include: configure.yml

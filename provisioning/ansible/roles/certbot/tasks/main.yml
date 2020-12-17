@@ -1,0 +1,5 @@
+---
+- name: Install certbot
+  snap:
+    name: certbot
+    classic: yes

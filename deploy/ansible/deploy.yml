@@ -1,0 +1,102 @@
+---
+- hosts: "{{hostname|default('sandbox')}}"
+  gather_facts: no
+  vars:
+    base_pas: "{{playbook_dir}}/../project/"
+    dest: "www/"
+    whoa: "no"
+  tasks:
+
+    - name: copy env from example
+      copy:
+        src: "{{ base_pas }}.env.example"
+        dest: "{{ base_pas }}.env"
+      delegate_to: 127.0.0.1
+      tags: ['npm']
+
+    - name: run npm
+      command: "{{ item }}"
+      args:
+        chdir: "{{ base_pas }}"
+      with_items:
+        - "npm install"
+        - "npm run prod"
+#      ignore_errors: yes
+#      become: "{{ whoa }}"
+      delegate_to: 127.0.0.1
+      tags: ['npm']
+
+    - name: run npm vps
+      command: "{{ item }}"
+      args:
+        chdir: "{{ base_pas }}"
+      with_items:
+        - "npm run compress"
+      delegate_to: 127.0.0.1
+      when: (whoa == "yes")
+      tags: ['npm']
+
+    - name: Enable maintenance mode
+      command: php artisan down --message="We updating our website right now! Please, retry after a moment." --retry=15
+      args:
+        chdir: "{{dest}}"
+      ignore_errors: yes
+      tags: ['stop']
+
+    - name: Content delivery
+      synchronize:
+        src: "{{base_pas}}"
+        dest: "{{dest}}"
+        recursive: yes
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=.env"
+          - "--exclude=.htaccess"
+          - "--exclude=.idea"
+      become: "{{ whoa }}"
+      tags: ['deploy']
+
+    - name: cleared after deploy
+      command: "{{ item }}"
+      args:
+        chdir: "{{dest}}"
+      with_items:
+#        - "php artisan cache:clear"
+        - "php artisan config:clear"
+#        - "php artisan route:clear"
+#        - "php artisan view:clear"
+#        - "composer update"
+#        - "php artisan config:cache"
+#        - "php artisan route:cache"
+#        - "php artisan view:cache"
+        - "composer dump-autoload"
+        - "php artisan clear-compiled"
+        - "php artisan migrate --force"
+#      ignore_errors: yes
+      become: "{{ whoa }}"
+      tags: ['clear']
+
+    - name: Disable maintenance mode
+      command: php artisan up
+      args:
+        chdir: "{{ dest }}"
+      ignore_errors: yes
+      tags: ['start']
+
+    - name: fix owner
+      file:
+        path: "{{ dest }}"
+        state: directory
+        recurse: yes
+        owner: www-data
+        group: www-data
+      become: "{{ whoa }}"
+      tags: ['vps']
+
+    - name: restart php7-fpm
+      service:
+        name: php7.4-fpm
+        enabled: yes
+        state: restarted
+      become: "{{ whoa }}"
+      tags: ['vps']

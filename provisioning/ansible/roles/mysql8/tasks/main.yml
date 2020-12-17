@@ -1,0 +1,45 @@
+---
+- apt_key:
+    data: "{{ lookup('file', 'keys/mysql_pubkey.asc') }}"
+    state: present
+
+- apt_repository:
+    repo: "deb http://repo.mysql.com/apt/ubuntu {{ ansible_distribution_release }} mysql-8.0"
+    state: present
+    filename: /etc/apt/sources.list.d/mysql8
+
+- apt:
+    name: "{{ item }}"
+    state: latest
+    update_cache: yes
+  with_items:
+    - mysql-server
+    - php-mysql
+    - python3-pymysql
+    - python3-mysql.connector
+
+# MySQL Configuration
+- name: Copy .my.cnf
+  template: src=my.cnf.j2 dest=/root/.my.cnf mode=0600
+
+- name: Sets the root password
+  mysql_user:
+    name: root
+    password: "{{ mysql_root_password }}"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+- name: Removes all anonymous user accounts
+  mysql_user:
+    name: ''
+    host_all: yes
+    state: absent
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+
+- name: Removes the MySQL test database
+  mysql_db:
+    name: test
+    state: absent
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+

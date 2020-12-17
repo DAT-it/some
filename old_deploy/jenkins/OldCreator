@@ -1,0 +1,50 @@
+node('corp') {
+    step([$class: 'WsCleanup'])
+
+    currentBuild.displayName = "Build id: ${BUILD_NUMBER}"
+    currentBuild.description = "Project: ${PROJECT} \n Target host: ${HOST}"
+
+    checkout scm
+
+    stage('Cleanup') {
+        sh "ansible-playbook ansible/old-creator.yml " +
+                "--tags \"cleanup\" " +
+                "--extra-vars \"" +
+                "hosts=${HOST} " +
+                "project_name=${PROJECT}\""
+    }
+
+    stage('Copy') {
+        sh "ansible-playbook ansible/old-creator.yml " +
+                "--tags \"copy\" " +
+                "--extra-vars \"" +
+                "hosts=${HOST} " +
+                "project_name=${PROJECT}\""
+    }
+
+    stage('Run') {
+        sh "ansible-playbook ansible/old-creator.yml " +
+                "--tags \"run\" " +
+                "--extra-vars \"" +
+                "hosts=${HOST} " +
+                "project_name=${PROJECT}\""
+    }
+
+    stage('Copy_DB') {
+        sh "ansible-playbook ansible/old-creator.yml " +
+                "--tags \"copydb\" " +
+                "--extra-vars \"" +
+                "hosts=${HOST} " +
+                "project_name=${PROJECT}\""
+    }
+
+    stage('Clean_tmp') {
+        sh "ansible-playbook ansible/old-creator.yml " +
+                "--tags \"cleantrash\" " +
+                "--extra-vars \"" +
+                "hosts=${HOST} " +
+                "project_name=${PROJECT}\""
+    }
+
+    step([$class: 'WsCleanup'])
+}

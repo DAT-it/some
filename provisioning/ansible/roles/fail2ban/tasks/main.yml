@@ -1,0 +1,13 @@
+---
+- git:
+    repo: https://github.com/fail2ban/fail2ban.git
+    dest: /tmp/f2b
+
+- name: install fail2ban
+  shell: |
+    python setup.py install
+    cp files/debian-initd /etc/init.d/fail2ban
+    update-rc.d fail2ban defaults
+  args:
+    chdir: /tmp/f2b
+  notify: Restart fail2ban

@@ -1,0 +1,17 @@
+---
+- action: stat path="{{ project_path }}/docker-compose.yml"
+  register: target_docker_compose
+
+- name: run compose
+  shell: /usr/local/bin/docker-compose up -d
+  args:
+    chdir: "{{ project_path }}"
+  when: target_docker_compose.stat.exists
+
+- name: Remove remote temporary backup folder
+  file:
+    dest: "{{ project_path }}/backup"
+    state: absent
+    
+- name: Clear unused image
+  shell: /usr/bin/docker image prune --force

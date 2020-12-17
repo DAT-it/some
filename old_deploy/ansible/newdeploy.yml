@@ -1,0 +1,112 @@
+---
+- hosts: "{{hosts|default('sandbox')}}"
+  become: yes
+  vars:
+    project_name: default
+    base_pas: "{{playbook_dir}}/../project/"
+    envv: development
+  tasks:
+
+  - name: backup trunk
+    synchronize:
+      src: /var/www/{{project_name}}/trunk/
+      dest: /var/www/{{project_name}}/back_trunk/
+      perms: yes
+      recursive: yes
+    delegate_to: "{{ inventory_hostname }}"
+    tags: ['backup']
+
+  - name: Dump databases
+    mysql_db:
+      state: dump
+      name: "{{ item }}"
+      target: "/var/www/{{project_name}}/back_trunk/back_{{ item }}.sql"
+    with_items:
+      - "{{ project[project_name].dbname }}"
+    when: (project[project_name].dbname is defined)
+    tags: [ 'backup' ]
+
+
+  - name: Remove Container
+    docker_container:
+      name: "{{project_name}}"
+      state: absent
+    tags: ['shutdown']
+
+  - name: Remove remote sources folder absent
+    file:
+      dest: /var/www/{{project_name}}/trunk
+      state: absent
+    tags: ['cleanup']
+
+  - name: Deploy project
+    synchronize:
+      src: "{{base_pas}}/trunk"
+      dest: /var/www/{{project_name}}/
+      perms: yes
+      recursive: yes
+      delete: yes
+      rsync_opts: "--exclude=.svn"
+    tags: ['deploy']
+
+  - name: Change permissions for /var/www/{{project_name}}/
+    file:
+      dest: /var/www/{{project_name}}/
+      owner: www-data
+      group: www-data
+      state: directory
+      recurse: yes
+    tags: ['deploy']
+
+  - local_action: stat path="{{base_pas}}/migrations"
+    register: st
+    become: no
+    tags: ['migrate']
+
+  - name: Deploy migrations
+    synchronize:
+       src: "{{base_pas}}/migrations"
+       dest: /var/www/{{project_name}}/
+       perms: yes
+       recursive: yes
+       delete: yes
+    when: (st.stat.isdir is defined and st.stat.isdir)
+    tags: ['migrate']
+
+  - name: Change permissions for liquibase script
+    file:
+      dest: /var/www/{{project_name}}/migrations/liquibase
+      mode: 0770
+    when: (st.stat.isdir is defined and st.stat.isdir)
+    tags: ['migrate']
+
+  - name: Run migrations for {{envv}} environment
+    shell: ./liquibase --defaultsFile=config/{{envv}}.properties update
+    args:
+      chdir: /var/www/{{project_name}}/migrations
+    when: (st.stat.isdir is defined and st.stat.isdir)
+    tags: ['migrate']
+
+  - name: Parse volume name
+    shell: echo {{ project[project_name].volumes }} | sed -e 's/^-v //;s/ -v /\n/g'
+    register: volume
+    tags: ['run']
+
+  - name: Create container for web project
+    docker:
+      name: "{{project_name}}"
+      image: "{{ project[project_name].imgname}}"
+      state: restarted
+      pull: always
+      ports: "{{ project[project_name].ports}}:8080"
+      env: STAGE="{{envv}}"
+      volumes: "{{item.stdout_lines}}"
+    with_items:
+      - "{{volume}}"
+    tags: ['run']
+
+  - name: Remove remote temporary backup folder
+    file:
+      dest: /var/www/{{project_name}}/back_trunk
+      state: absent
+    tags: ['cleanback']

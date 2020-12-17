@@ -1,0 +1,18 @@
+---
+- name: Deploy docker-compose
+  synchronize:
+    src: "{{ base_path }}"
+    dest: "{{ project_path }}/"
+    perms: yes
+    recursive: yes
+    delete: yes
+    rsync_opts: "--exclude=*@*"
+  when: source_docker_compose.stat.exists
+
+- name: Change permissions perl scripts
+  command: find "{{ project_path }}/" -type f -iname '*.pl' -exec chmod 755 {} \;
+  when: source_docker_compose.stat.exists
+
+- name: Change permissions shell scripts
+  command: find "{{ project_path }}/" -type f -iname '*.sh' -exec chmod 755 {} \;
+  when: source_docker_compose.stat.exists

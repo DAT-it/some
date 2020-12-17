@@ -1,0 +1,13 @@
+---
+- action: stat path="{{ project_path }}/docker-compose.yml"
+  register: target_docker_compose
+
+- template: src=env.j2 dest="{{ project_path }}/.env"
+  when: target_docker_compose.stat.exists
+
+- name: build compose
+  shell: /usr/local/bin/docker-compose build --no-cache
+  args:
+    chdir: "{{ project_path }}"
+  when: target_docker_compose.stat.exists
+

@@ -1,0 +1,120 @@
+---
+- hosts: "{{hosts|default('sandbox')}}"
+  become: yes
+  vars:
+    project_name: default
+    internalport: "{{project[project_name].intport|default('8080')}}"
+    old_name: "old_{{project_name}}"
+    envv: old
+    old_ports: "{{ (project[project_name].apache_port |int) + 100 }}"
+    runvolum: "{{ project[project_name].volumes | regex_replace(project_name, old_name) }}"
+  tasks:
+
+  - name: Container if exist
+    docker:
+      name: "{{old_name}}"
+      image: "{{ project[project_name].imgname }}"
+      state: absent
+    tags: [ 'cleanup' ]
+
+  - file:
+      dest: /var/www/{{old_name}}/
+      state: absent
+    tags: [ 'cleanup' ]
+
+  - name: Import to database
+    mysql_db:
+      name: "{{ item | regex_replace('^', 'old_') }}"
+      state: absent
+    with_items:
+    - "{{ project[project_name].dbname }}"
+    when: (project[project_name].dbname is defined)
+    tags: [ 'cleanup' ]
+
+  - name: move project
+    synchronize:
+      src: /var/www/{{project_name}}/
+      dest: /var/www/{{old_name}}/
+      perms: yes
+      recursive: yes
+      delete: yes
+      rsync_opts: "--exclude=.svn"
+    delegate_to: "{{ inventory_hostname }}"
+    tags: [ 'copy' ]
+
+  - template: src=oldnginx.conf.j2 dest=/var/www/_global_cfg/nginx/cfg/{{ old_name }}.conf
+    tags: [ 'copy' ]
+
+  - shell: echo {{ project[project_name].volumes }} | sed -e 's/^-v //;s/ -v /\n/g' | sed -e 's/{{project_name}}/{{old_name}}/g'
+    register: volume
+    tags: [ 'copy','run' ]
+
+  - template: src=oldrun.sh.j2 dest=/var/www/{{old_name}}/{{old_name}}.sh mode=0755
+    tags: [ 'copy' ]
+
+
+  - name: Create container apache for web project
+    docker:
+      name: "{{old_name}}"
+      image: "{{ project[project_name].imgname }}"
+      state: restarted
+      restart_policy: always
+      pull: always
+      ports: "{{ old_ports }}:{{ internalport }}"
+      env: STAGE="{{ envv }}"
+      volumes: "{{ item.stdout_lines }}"
+    with_items:
+    - "{{ volume }}"
+    tags: [ 'run' ]
+
+  - name: Restart nginx container
+    command: docker restart "nginx-proxy"
+    tags: [ 'run' ]
+
+  - name: Dump databases
+    mysql_db:
+      state: dump
+      name: "{{ item }}"
+      target: "/tmp/{{ item | regex_replace('^', 'old_') }}.sql"
+    with_items:
+    - "{{ project[project_name].dbname }}"
+    when: (project[project_name].dbname is defined)
+    tags: [ 'copydb' ]
+
+  - name: Import to database
+    mysql_db:
+      name: "{{ item | regex_replace('^', 'old_') }}"
+      state: import
+      target: "/tmp/{{ item | regex_replace('^', 'old_') }}.sql"
+    with_items:
+    - "{{ project[project_name].dbname }}"
+    when: (project[project_name].dbname is defined)
+    tags: [ 'copydb' ]
+
+  - mysql_user:
+      name: "{{ project[project_name].dbuser }}"
+      password: "{{ project[project_name].dbpass }}"
+      priv: 'old_{{ project[project_name].dbname }}.*:ALL'
+      append_privs: yes
+      login_user: root
+      login_password: "{{ mysql_root_pass }}"
+      host: "{{ item }}"
+      state: present
+    with_items:
+    - "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+    - '172.17.0.%'
+    when: (project[project_name].dbuser is defined)
+    tags: [ 'copydb' ]
+
+  - find: paths=/tmp patterns="*.sql"
+    register: to_del
+    tags: [ 'cleantrash' ]
+
+  - debug: msg="Deleted {{ to_del.files }}"
+
+  #  - file: path="{{ item.path }}" state=absent
+  #    with_items: "{{ to_del.files }}"
+  #    tags: [ 'cleantrash' ]
+
+  - file: path=/var/www/{{old_name}}/{{project_name}}.sh state=absent
+    tags: [ 'cleantrash' ]

@@ -1,0 +1,30 @@
+---
+- hosts: "{{hosts|default('sandbox')}}"
+  become: yes
+  vars:
+    project_name: default
+    base_path: "{{playbook_dir}}/../project/"
+    envv: development
+#    internalport: "{{project[project_name].intport|default('8080')}}"
+    project_path: "/var/www/{{project_name}}"
+#    DFname: "{{dockerfilename|default('Dockerfile')}}"
+
+  roles:
+
+#  - role: shutdown
+#    tags: ['shutdown']
+
+  - role: cleanup
+    tags: ['cleanup']
+
+  - role: deploy
+    tags: ['deploy']
+
+#  - role: migrate
+#    tags: ['migrate']
+    
+  - role: builds
+    tags: ['builds']    
+
+  - role: run
+    tags: ['run']

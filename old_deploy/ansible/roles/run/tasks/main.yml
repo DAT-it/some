@@ -1,0 +1,44 @@
+---
+- name: Check Dockerfile
+  local_action: stat path={{base_path}}/{{ DFname }}
+  register: docker_file
+  become: no
+
+- action: stat path="{{ project_path }}/docker-compose.yml"
+  register: target_docker_compose
+
+- name: Run compose
+  #  include: compose.yml
+  include_tasks: compose.yml
+  static: no
+  when: project[project_name].compose is defined
+
+- name: Parse volume name
+  shell: echo {{ project[project_name].volumes }} | sed -e 's/^-v //;s/ -v /\n/g'
+  register: volume
+  when: project[project_name].compose is not defined
+
+- name: Start build task
+  #  include: build.yml
+  include_tasks: build.yml
+  static: no
+  when: (docker_file.stat.exists and project[project_name].buildck is defined and project[project_name].compose is not defined)
+
+- name: Run container
+  docker:
+    name: "{{ project_name }}"
+    image: "{{ project[project_name].imgname }}"
+    state: restarted
+    restart_policy: always
+    pull: "{{ 'missing' if (project[project_name].buildck is defined) else 'always' }}"
+    ports: "{{ project[project_name].apache_port }}:{{ internalport }}"
+    env: STAGE="{{ envv }}"
+    volumes: "{{ item.stdout_lines }}"
+  with_items:
+  - "{{ volume }}"
+  when: project[project_name].compose is not defined
+
+- name: Remove remote temporary backup folder
+  file:
+    dest: "{{ project_path }}/backup"
+    state: absent

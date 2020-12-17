@@ -1,0 +1,30 @@
+---
+- template: src=env.j2 dest="{{ project_path }}/.env"
+  when: target_docker_compose.stat.exists
+
+- name: Patch dbport into docker-compose
+  lineinfile:
+    dest: "{{ project_path }}/docker-compose.yml"
+    regexp: ":3306'"
+    line: "      - '{{ project[project_name].dbport }}:3306'"
+  when: project[project_name].dbport is defined and target_docker_compose.stat.exists
+
+- name: Patch apache_port into docker-compose
+  lineinfile:
+    dest: "{{ project_path }}/docker-compose.yml"
+    regexp: ":8080'"
+    line: "      - '{{ project[project_name].apache_port }}:8080'"
+  when: project[project_name].apache_port is defined and target_docker_compose.stat.exists
+
+- name: Patch nginx_port into docker-compose
+  lineinfile:
+    dest: "{{ project_path }}/docker-compose.yml"
+    regexp: ":80'"
+    line: "      - '{{ project[project_name].nginx_port }}:80'"
+  when: project[project_name].nginx_port is defined and target_docker_compose.stat.exists
+
+- name: start compose
+  shell: /usr/local/bin/docker-compose up -d
+  args:
+    chdir: "{{ project_path }}"
+  when: target_docker_compose.stat.exists

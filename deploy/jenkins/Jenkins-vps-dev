@@ -1,0 +1,128 @@
+node {
+    step([$class: 'WsCleanup'])
+
+    try {
+        notifyBuild('STARTED')
+
+    currentBuild.displayName = "Build id: ${BUILD_NUMBER}"
+    currentBuild.description = "Project: ${PROJECT}, Source: ${TAG} \n Target host: ${HOST}"
+//
+    checkout scm
+
+        stage('Checkout') { // for display purposes
+            checkout([$class: 'GitSCM',
+                      branches: [[name: "${TAG}"]],
+                      doGenerateSubmoduleConfigurations: false,
+                      extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'project']],
+                      submoduleCfg: [],
+                      submoduleCfg: [],
+                      userRemoteConfigs: [[url: "${SOURCE}", credentialsId: 'global']]
+            ]);   }
+
+        stage('NPM RUN') {
+                ansiblePlaybook(
+                    playbook: 'ansible/deploy-dev.yml',
+                    tags: 'npm',
+                    extraVars: [
+                        hostname: "${HOST}",
+                        dest: "${TARGET}",
+                        whoa: "${PERMIS}"
+                    ])
+        }
+
+        stage('Maintenance-ON') {
+                ansiblePlaybook(
+                    playbook: 'ansible/deploy.yml',
+                    tags: 'stop',
+                    extraVars: [
+                        hostname: "${HOST}",
+                        dest: "${TARGET}"
+                    ])
+        }
+
+        stage('Deploy') {
+                ansiblePlaybook(
+                    playbook: 'ansible/deploy.yml',
+                    tags: 'deploy',
+                    extraVars: [
+                        hostname: "${HOST}",
+                        dest: "${TARGET}",
+                        whoa: "${PERMIS}"
+                    ])
+        }
+
+        stage('Post-deployment commands') {
+                ansiblePlaybook(
+                    playbook: 'ansible/deploy.yml',
+                    tags: 'clear',
+                    extraVars: [
+                        hostname: "${HOST}",
+                        dest: "${TARGET}",
+                        whoa: "${PERMIS}"
+                    ])
+        }
+
+        stage('Maintenance-OFF') {
+                ansiblePlaybook(
+                    playbook: 'ansible/deploy.yml',
+                    tags: 'start',
+                    extraVars: [
+                        hostname: "${HOST}",
+                        dest: "${TARGET}"
+                    ])
+        }
+
+        stage('VPS-fix-path') {
+                ansiblePlaybook(
+                    playbook: 'ansible/deploy.yml',
+                    tags: 'vps',
+                    extraVars: [
+                        hostname: "${HOST}",
+                        dest: "${TARGET}",
+                        whoa: "${PERMIS}"
+                    ])
+        }
+
+  } catch (e) {
+    // If there was an exception thrown, the build failed
+    currentBuild.result = "FAILED"
+    throw e
+  } finally {
+    // Success or failure, always send notifications
+    notifyBuild(currentBuild.result)
+  }
+}
+
+def notifyBuild(String buildStatus = 'STARTED') {
+  // build status of null means successful
+  buildStatus =  buildStatus ?: 'SUCCESSFUL'
+
+  // Default values
+  def colorName = 'RED'
+  def colorCode = '#FF0000'
+  def subject = "${buildStatus}: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'"
+  def summary = "${subject} (${env.BUILD_URL})"
+  def details = """<p>STARTED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]':</p>
+    <p>Check console output at &QUOT;<a href='${env.BUILD_URL}'>${env.JOB_NAME} [${env.BUILD_NUMBER}]</a>&QUOT;</p>"""
+
+  // Override default values based on build status
+  if (buildStatus == 'STARTED') {
+    color = 'YELLOW'
+    colorCode = '#FFFF00'
+  } else if (buildStatus == 'SUCCESSFUL') {
+    color = 'GREEN'
+    colorCode = '#00FF00'
+  } else {
+    color = 'RED'
+    colorCode = '#FF0000'
+  }
+
+  // Send notifications
+  slackSend (color: colorCode, message: summary)
+
+  emailext(
+      subject: subject,
+      body: details,
+      recipientProviders: [[$class: 'DevelopersRecipientProvider']]
+    )
+}

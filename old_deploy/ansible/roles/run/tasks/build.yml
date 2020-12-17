@@ -1,0 +1,9 @@
+---
+- copy: src="{{ base_path }}/{{ DFname }}" dest="{{ project_path }}/Dockerfile" group=deployuser owner=deployuser
+
+- name: Build image
+  docker_image:
+    path: "{{ project_path }}"
+    name: "{{ project[project_name].imgname }}"
+    buildargs:
+      listen_port: "{{ internalport }}"

@@ -1,0 +1,7 @@
+docker run \
+ --name "{{ project_name }}" \
+ -d --restart always \
+ -e STAGE={{project[project_name].envv}} \
+ -p {{project[project_name].apache_port}}:8080 \
+ {{project[project_name].volumes}} \
+ {{project[project_name].imgname}}

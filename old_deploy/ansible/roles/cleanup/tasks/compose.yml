@@ -1,0 +1,19 @@
+---
+- name: Docker-compose state
+  shell: /usr/local/bin/docker-compose ps
+  register: compose_state
+  args:
+    chdir: "{{ project_path }}"
+  when: target_docker_compose.stat.exists
+
+- name: Docker-compose down command
+  shell: /usr/local/bin/docker-compose down
+  args:
+    chdir: "{{ project_path }}"
+  when: ('compose_state.stdout_lines' != "" and target_docker_compose.stat.exists)
+
+- name: Remove remote sources folder
+  file:
+    dest: "{{ project_path }}"
+    state: absent
+  when: (project[project_name].compose is defined and source_docker_compose.stat.exists)

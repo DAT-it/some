@@ -1,0 +1,40 @@
+server {
+    listen   80;
+    server_name {{ project[project_name].site_name }};
+
+    access_log /var/log/nginx/{{ project_name }}.access.log combined buffer=256k;
+    error_log /var/log/nginx/{{ project_name }}.error.log error;
+
+    location ~* (wp-admin|wp-login|admin|Security) {
+        proxy_pass http://172.17.0.1:{{ project[project_name].apache_port }};
+        proxy_pass_header Set-Cookie;
+        proxy_cache_bypass 1;
+        proxy_store off;
+        include /etc/nginx/include/allow_offices_ip;
+    }
+
+
+     # save forms from cache
+    location ~* (contact-us|admin-ajax) {
+        proxy_pass http://172.17.0.1:{{ project[project_name].apache_port }};
+        proxy_pass_header Set-Cookie;
+        proxy_cache_bypass 1;
+        proxy_store off;
+    }
+
+
+    location ~* "\.(bmp|ttf|css|docx?|gif|gz|html?|ico|jpe?g|js|pdf|png|pptx?|txt|swf|xls[mx]?)" {
+        access_log off;
+        log_not_found off;
+        proxy_pass http://172.17.0.1:{{ project[project_name].apache_port }};
+        expires 30d;
+    }
+
+    location / {
+        proxy_pass  http://172.17.0.1:{{ project[project_name].apache_port }};
+        expires 0h;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}

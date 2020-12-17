@@ -1,0 +1,7 @@
+---
+- name: Remove image
+  docker_image:
+    state: absent
+    name: "{{ project[project_name].imgname }}"
+    timeout: 300
+  when: docker_file.stat.exists

@@ -1,0 +1,54 @@
+---
+- name: Add nginx repo key
+  apt_key:
+    url: https://nginx.org/keys/nginx_signing.key
+    state: present
+
+- apt_repository:
+    repo: "deb http://nginx.org/packages/ubuntu {{ ansible_distribution_release }} nginx"
+    state: present
+    filename: /etc/apt/sources.list.d/nginx
+
+- name: Install nginx
+  apt:
+    pkg:
+      - nginx-full
+    default_release: "{{ ansible_distribution_release }}"
+    update_cache: yes
+    state: latest
+
+- name: Sets Nginx conf file
+  template:
+    src: "nginx.conf.j2"
+    dest: "/etc/nginx/sites-available/{{ http_conf }}"
+  notify: Restart Nginx
+
+- file:
+    src: "/etc/nginx/sites-available/{{ http_conf }}"
+    dest: "/etc/nginx/sites-enabled/{{ http_conf }}"
+    state: link
+  notify: Reload Nginx
+
+- name: Removes "default" site
+  file:
+    path: "/etc/nginx/sites-enabled/default"
+    state: absent
+  notify: Reload Nginx
+
+- name: Sets Up PHP Info Page
+  template:
+    src: "info.php.j2"
+    dest: "/var/www/html/info.php"
+
+- user:
+    name: nginx
+    groups: www-data
+    append: yes
+
+- file:
+    path: /var/www/html/
+    state: directory
+    recurse: yes
+    owner: www-data
+    group: www-data
+
